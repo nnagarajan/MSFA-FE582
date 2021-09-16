@@ -1,0 +1,12 @@
+"0","#Load Libraries"
+"0","library('gdata')"
+"0","library('ggplot2')"
+"0","library('plyr')"
+"0","library('doBy')"
+"0","library('readxl') "
+"0","library('pastecs')"
+"0",""
+"0","#Load the Libraries"
+"0","TSA_COVID_BTC <- read_excel(""Clean Project Data-Based on Date.xlsx"",1)"
+"2","Error: `path` does not exist: ‘Clean Project Data-Based on Date.xlsx’
+"

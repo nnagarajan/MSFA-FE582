@@ -1,0 +1,1 @@
+"0","  ggplot(mapping=aes(oj.ds.train.cv.tree$size, oj.ds.train.cv.tree$dev)) + geom_line() + geom_point() + xlab(""size"") +ylab(""error"")"

@@ -1,0 +1,320 @@
+library("ggplot2")
+library('gdata')
+library('dplyr')
+library('lubridate')
+library('tidyverse')
+library('collections')
+library('Hmisc')
+library('psych')
+library('ISLR')
+library('class')
+library('MASS')
+
+options(scipen = 999)
+
+
+#ISLR::Weekly
+ISLR::Weekly
+
+# a) Produce some numerical and graphical summaries of the Weekly data. Do there appear to be any patterns?
+summary(ISLR::Weekly)
+
+egg::ggarrange(ISLR::Weekly %>%  ggplot(mapping = aes(y=Lag1,x=Direction)) + geom_boxplot() ,
+ISLR::Weekly %>%  ggplot(mapping = aes(y=Lag1,x=Direction)) + geom_boxplot() ,
+ISLR::Weekly %>%  ggplot(mapping = aes(y=Lag2,x=Direction)) + geom_boxplot() ,
+ISLR::Weekly %>%  ggplot(mapping = aes(y=Lag3,x=Direction)) + geom_boxplot() ,
+ISLR::Weekly %>%  ggplot(mapping = aes(y=Lag4,x=Direction)) + geom_boxplot() ,
+ISLR::Weekly %>%  ggplot(mapping = aes(y=Lag5,x=Direction)) + geom_boxplot() ,
+ISLR::Weekly %>%  ggplot(mapping = aes(y=Volume,x=Direction)) + geom_boxplot()) 
+
+egg::ggarrange(
+ISLR::Weekly %>%  ggplot(mapping = aes(x=factor(1), y=Lag1)) + 
+  geom_boxplot(width=0.4,fill="white") + 
+  geom_jitter(aes(color=Direction,shape=Direction), width=0.1,size=1),
+ISLR::Weekly %>%  ggplot(mapping = aes(x=factor(1), y=Lag2)) + 
+  geom_boxplot(width=0.4,fill="white") + 
+  geom_jitter(aes(color=Direction,shape=Direction), width=0.1,size=1),
+ISLR::Weekly %>%  ggplot(mapping = aes(x=factor(1), y=Lag3)) + 
+  geom_boxplot(width=0.4,fill="white") + 
+  geom_jitter(aes(color=Direction,shape=Direction), width=0.1,size=1),
+ISLR::Weekly %>%  ggplot(mapping = aes(x=factor(1), y=Lag4)) + 
+  geom_boxplot(width=0.4,fill="white") + 
+  geom_jitter(aes(color=Direction,shape=Direction), width=0.1,size=1),
+ISLR::Weekly %>%  ggplot(mapping = aes(x=factor(1), y=Lag5)) + 
+  geom_boxplot(width=0.4,fill="white") + 
+  geom_jitter(aes(color=Direction,shape=Direction), width=0.1,size=1),
+ISLR::Weekly %>%  ggplot(mapping = aes(x=factor(1), y=Volume)) + 
+  geom_boxplot(width=0.4,fill="white") + 
+  geom_jitter(aes(color=Direction,shape=Direction), width=0.1,size=1)
+)  
+
+
+egg::ggarrange(
+ISLR::Weekly %>% ggplot(mapping = aes(Lag1)) +
+                 stat_ecdf(aes(color = Direction,linetype = Direction), 
+                 geom = "step", size = 1.5) +
+                 scale_color_manual(values = c("#00AFBB", "#E7B800"))+ labs(y = "f"),
+ISLR::Weekly %>% ggplot(mapping = aes(Lag2)) +
+            stat_ecdf(aes(color = Direction,linetype = Direction), 
+            geom = "step", size = 1.5) +
+            scale_color_manual(values = c("#00AFBB", "#E7B800"))+ labs(y = "f"),
+ISLR::Weekly %>% ggplot(mapping = aes(Lag3)) +
+            stat_ecdf(aes(color = Direction,linetype = Direction), 
+            geom = "step", size = 1.5) +
+            scale_color_manual(values = c("#00AFBB", "#E7B800"))+ labs(y = "f"),
+ISLR::Weekly %>% ggplot(mapping = aes(Lag4)) +
+            stat_ecdf(aes(color = Direction,linetype = Direction), 
+            geom = "step", size = 1.5) +
+            scale_color_manual(values = c("#00AFBB", "#E7B800"))+ labs(y = "f"),
+ISLR::Weekly %>% ggplot(mapping = aes(Lag5)) +
+            stat_ecdf(aes(color = Direction,linetype = Direction), 
+            geom = "step", size = 1.5) +
+            scale_color_manual(values = c("#00AFBB", "#E7B800"))+ labs(y = "f"),
+ISLR::Weekly %>% ggplot(mapping = aes(Volume)) +
+            stat_ecdf(aes(color = Direction,linetype = Direction), 
+            geom = "step", size = 1.5) +
+            scale_color_manual(values = c("#00AFBB", "#E7B800"))+ labs(y = "f")  
+)
+
+## From the plots we can see there is no correlation between lags and volume against Direction
+
+# b) Use the full data set to perform a logistic regression with Direction as the response and the five lag variables plus Volume as predictors. Use the summary function to print the results. Do any of the predictors appear to be statistically significant? If so, which ones?
+weekly.glm.fit=glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume,data=ISLR::Weekly,family=binomial)
+summary(weekly.glm.fit)
+confint(weekly.glm.fit)
+confint.default(weekly.glm.fit)
+summary(Weekly$Direction)
+
+## From above Deviance table we can see p for lag2 is between 0.01 and 0.05 which is somewhat significant for the model
+## For response variable Direction which is a factor of (Down,Up) last value is considered as event
+
+# c) Compute the confusion matrix and overall fraction of correct predictions. Explain what the confusion matrix is telling you about the types of mistakes made by logistic regression.
+weekly.glm.fit.predict=predict(weekly.glm.fit,newdata = Weekly, type="response")
+weekly.glm.fit.predict.v=rep("Down",dim(Weekly)[1])
+weekly.glm.fit.predict.v[weekly.glm.fit.predict>0.5]="Up"
+Weekly.2 = cbind(Weekly,weekly.glm.fit.predict.v)
+cfm=table(Weekly.2$Direction,Weekly.2$weekly.glm.fit.predict.v)
+cfms<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                  cfm["Down","Down"]/sum(cfm["Down",]),
+                  1-mean(Weekly.2$Direction==Weekly.2$weekly.glm.fit.predict.v))
+
+names(cfms)<-c("Sensitivity","Specificity","Error rate")
+cfms
+cfm
+
+## Model has high specificity and error rate, when there are more than one predictor variable Logistic regression isn't suitable
+
+# d) Now fit the logistic regression model using a training data period from 1990 to 2008, with Lag2 as the only predictor. Compute the confusion matrix and the overall fraction of correct predictions for the held out data (that is, the data from 2009 and 2010).
+Weekly.training = Weekly %>% filter(Year>=1990,Year<=2008)
+Weekly.test = Weekly %>% filter(Year>=2009,Year<=2010)
+
+weekly.glm.fit=glm(Direction~Lag2,data=Weekly.training,family=binomial)
+summary(weekly.glm.fit)
+#Predict using test
+weekly.glm.fit.predict=predict(weekly.glm.fit,newdata = Weekly.test, type="response")
+weekly.glm.fit.predict.v=rep("Down",dim(Weekly.test)[1])
+weekly.glm.fit.predict.v[weekly.glm.fit.predict>0.5]="Up"
+Weekly.2 = cbind(Weekly.test,weekly.glm.fit.predict.v)
+cfm=table(Weekly.2$Direction,Weekly.2$weekly.glm.fit.predict.v)
+cfms1<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+           cfm["Down","Down"]/sum(cfm["Down",]),
+           1-mean(Weekly.2$Direction==Weekly.2$weekly.glm.fit.predict.v))
+
+names(cfms1)<-c("Sensitivity","Specificity","Error rate")
+cfms1
+cfm
+
+# e) Repeat d) using LDA
+weekly.lda.fit=lda(Direction~Lag2,data=Weekly.training)
+#weekly.lda.fit
+#plot(weekly.lda.fit)
+#Predict using test
+weekly.lda.fit.predict=predict(weekly.lda.fit,newdata = Weekly.test, type="response")
+Weekly.2 = cbind(Weekly.test,weekly.lda.fit.predict$class)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.lda<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                  cfm["Down","Down"]/sum(cfm["Down",]),
+                  1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.lda)<-c("Sensitivity","Specificity","Error rate")
+cfms.lda
+cfm
+
+# f) Repeat d) using QDA
+weekly.qda.fit=qda(Direction~Lag2,data=Weekly.training)
+#weekly.qda.fit
+##
+#Weekly.test %>% filter(Direction=="Up") ## 61
+#Weekly.test %>% filter(Direction=="Down") ## 43
+#sum(weekly.qda.fit.predict$class=="Up") ##87
+#sum(weekly.qda.fit.predict$class=="Down") ##17
+#Predict using test
+weekly.qda.fit.predict=predict(weekly.qda.fit,newdata = Weekly.test, type="response")
+Weekly.2 = cbind(Weekly.test,weekly.qda.fit.predict$class)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.qda<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                     cfm["Down","Down"]/sum(cfm["Down",]),
+                     1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.qda)<-c("Sensitivity","Specificity","Error rate")
+cfm
+cfms.qda
+
+# Repeat d) using KNN with K = 1.
+weekly.knn.fit=knn(Weekly.training %>% dplyr::select(Lag2) %>% data.matrix, 
+                   Weekly.test %>% dplyr::select(Lag2)  %>% data.matrix ,
+                   Weekly.training$Direction ,k=1 )
+Weekly.2 = cbind(Weekly.test,weekly.knn.fit)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.knn<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                     cfm["Down","Down"]/sum(cfm["Down",]),
+                     1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.knn)<-c("Sensitivity","Specificity","Error rate")
+cfm
+cfms.knn
+
+#h) Which of these methods appears to provide the best results on this data?
+perfs<-rbind(cbind(cfms1,class="logistic",predictors="Lag2"),
+             cbind(cfms.lda,class="lda",predictors="Lag2"),
+             cbind(cfms.qda,class="qda",predictors="Lag2"), 
+             cbind(cfms.knn,class="knn",predictors="Lag2")
+             )
+
+## Lda and Logistic regression seems to better in terms of sensitivity
+## Knn-1 did better with specificity but error rate is about 50%
+
+#i) Experiment with different combinations of predictors, including possible
+# transformations and interactions, for each of the methods. Report the variables, method, and associated confusion matrix that appears to provide the best results on the held out data. Note that you should also experiment with values for K in the KNN classifier.
+
+## Knn optimized
+
+# Knn-2 with Lag2
+weekly.knn.fit=knn(Weekly.training %>% dplyr::select(Lag2) %>% data.matrix, 
+                   Weekly.test %>% dplyr::select(Lag2)  %>% data.matrix ,
+                   Weekly.training$Direction ,k=2 )
+Weekly.2 = cbind(Weekly.test,weekly.knn.fit)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.knn.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                     cfm["Down","Down"]/sum(cfm["Down",]),
+                     1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.knn.opt)<-c("Sensitivity","Specificity","Error rate")
+
+perfs<-rbind(perfs,cbind(cfms.knn.opt,class="knn-2",predictors="Lag2"))
+cfm
+cfms.knn.opt
+
+# Knn-3 with Lag2
+
+weekly.knn.fit=knn(Weekly.training %>% dplyr::select(Lag2) %>% data.matrix, 
+                   Weekly.test %>% dplyr::select(Lag2)  %>% data.matrix ,
+                   Weekly.training$Direction ,k=3 )
+Weekly.2 = cbind(Weekly.test,weekly.knn.fit)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.knn.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                         cfm["Down","Down"]/sum(cfm["Down",]),
+                         1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.knn.opt)<-c("Sensitivity","Specificity","Error rate")
+
+perfs<-rbind(perfs,cbind(cfms.knn.opt,class="knn-3",predictors="Lag2"))
+cfm
+cfms.knn.opt
+
+# Knn-5 with Lag2
+weekly.knn.fit=knn(Weekly.training %>% dplyr::select(Lag2) %>% data.matrix, 
+                   Weekly.test %>% dplyr::select(Lag2)  %>% data.matrix ,
+                   Weekly.training$Direction ,k=5 )
+Weekly.2 = cbind(Weekly.test,weekly.knn.fit)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.knn.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                         cfm["Down","Down"]/sum(cfm["Down",]),
+                         1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.knn.opt)<-c("Sensitivity","Specificity","Error rate")
+perfs<-rbind(perfs,cbind(cfms.knn.opt,class="knn-5",predictors="Lag2"))
+cfm
+cfms.knn.opt
+
+# Knn-2 with Lag1+Lag2
+weekly.knn.fit=knn(Weekly.training %>% dplyr::select(Lag1,Lag2) %>% data.matrix, 
+                   Weekly.test %>% dplyr::select(Lag1,Lag2)  %>% data.matrix ,
+                   Weekly.training$Direction ,k=2 )
+Weekly.2 = cbind(Weekly.test,weekly.knn.fit)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.knn.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                         cfm["Down","Down"]/sum(cfm["Down",]),
+                         1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.knn.opt)<-c("Sensitivity","Specificity","Error rate")
+perfs<-rbind(perfs,cbind(cfms.knn.opt,class="knn-2",predictors="Lag1+Lag2"))
+cfm
+cfms.knn.opt
+
+# Knn-3 with Lag1+Lag2
+weekly.knn.fit=knn(Weekly.training %>% dplyr::select(Lag2) %>% data.matrix, 
+                   Weekly.test %>% dplyr::select(Lag2)  %>% data.matrix ,
+                   Weekly.training$Direction ,k=3 )
+Weekly.2 = cbind(Weekly.test,weekly.knn.fit)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.knn.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                         cfm["Down","Down"]/sum(cfm["Down",]),
+                         1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.knn.opt)<-c("Sensitivity","Specificity","Error rate")
+perfs<-rbind(perfs,cbind(cfms.knn.opt,class="knn-3",predictors="Lag1+Lag2"))
+cfm
+cfms.knn.opt
+
+# GLM with Lag1+Lag2
+Weekly.training
+weekly.glm.fit=glm(Direction~Lag1+Lag2,data=Weekly.training,family=binomial)
+#Predict using test
+weekly.glm.fit.predict=predict(weekly.glm.fit,newdata = Weekly.test, type="response")
+weekly.glm.fit.predict.v=rep("Down",dim(Weekly.test)[1])
+weekly.glm.fit.predict.v[weekly.glm.fit.predict>0.5]="Up"
+Weekly.2 = cbind(Weekly.test,weekly.glm.fit.predict.v)
+cfm=table(Weekly.2$Direction,Weekly.2$weekly.glm.fit.predict.v)
+cfms.glm.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                  cfm["Down","Down"]/sum(cfm["Down",]),
+                  1-mean(Weekly.2$Direction==Weekly.2$weekly.glm.fit.predict.v))
+
+names(cfms.glm.opt)<-c("Sensitivity","Specificity","Error rate")
+perfs<-rbind(perfs,cbind(cfms.glm.opt,class="logistic",predictors="Lag1+Lag2"))
+cfm
+cfms.glm.opt
+
+# LDA with Lag1+(Lag2*Lag2)
+weekly.lda.fit=lda(Direction~Lag1+(Lag2*Lag2),data=Weekly.training)
+weekly.lda.fit.predict=predict(weekly.lda.fit,newdata = Weekly.test, type="response")
+Weekly.2 = cbind(Weekly.test,weekly.lda.fit.predict$class)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.lda.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                     cfm["Down","Down"]/sum(cfm["Down",]),
+                     1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.lda.opt)<-c("Sensitivity","Specificity","Error rate")
+perfs<-rbind(perfs,cbind(cfms.lda.opt,class="lda",predictors="Lag1+(Lag2*Lag2)"))
+cfm
+cfms.lda.opt
+# QDA with Lag1+(Lag2*Lag2)
+weekly.qda.fit=qda(Direction~Lag1+(Lag2*Lag2),data=Weekly.training)
+#Predict using test
+weekly.qda.fit.predict=predict(weekly.qda.fit,newdata = Weekly.test, type="response")
+Weekly.2 = cbind(Weekly.test,weekly.qda.fit.predict$class)
+names(Weekly.2)[10]<-"Pred.Direction"
+cfm=table(Weekly.2$Direction,Weekly.2$Pred.Direction)
+cfms.qda.opt<-data.frame(cfm["Up","Up"]/sum(cfm["Up",]),
+                     cfm["Down","Down"]/sum(cfm["Down",]),
+                     1-mean(Weekly.2$Direction==Weekly.2$Pred.Direction))
+names(cfms.qda.opt)<-c("Sensitivity","Specificity","Error rate")
+perfs<-rbind(perfs,cbind(cfms.qda.opt,class="qda",predictors="Lag1+(Lag2*Lag2)"))
+cfm
+cfms.qda.opt
+
+perfs
+
+
+
+

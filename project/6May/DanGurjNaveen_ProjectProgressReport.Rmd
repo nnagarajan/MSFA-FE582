@@ -1,0 +1,731 @@
+---
+title: "FE-582: Financial Data Science  \nProject Progress Report"
+author: "Daniel Bachalis, Gurjivan Kalkat, Naveen Nagarajan"
+date: 'Due: April 20, 2021'
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "D:/Dan/Stevens/Financial Data Science/Project")
+library(tidyverse)
+library(readxl)
+options(scipen=999)
+library('gdata')
+library('ggplot2')
+library('plyr')
+library('doBy')
+library('readxl') 
+library('pastecs')
+library(ggpubr)
+library(ISLR)
+library(splines)
+library(gam)
+library(tree)
+library(randomForest)
+library(corrplot)
+library(GGally)
+library(quantmod)
+library(fBasics)
+library(xts)
+options(scipen=999)
+```
+
+\#\#Exploratory Data Analysis (EDA)
+
+\#\#\#Covid and TSA Datasets (Gurj) \* Summarize all of the datasets \*
+Load in datasets for TSA and Covid data \* Explore and compare visually,
+look for outliers and anything interesting
+
+```{r}
+#Load Libraries
+library('gdata')
+library('ggplot2')
+library('plyr')
+library('doBy')
+library('readxl') 
+library('pastecs')
+
+#Load the Libraries
+TSA_COVID_BTC <- read_excel("Clean Project Data-Based on Date.xlsx",1)
+TLT_DJIA_NDX_GOLD_OIL<-read_excel("Clean Project Data-Based on Date.xlsx",2)
+GDP_Uneployment<-read_excel("Clean Project Data-Based on Date.xlsx",3)
+
+#Coverting to Dates
+TSA_COVID_BTC$Date<-as.Date(as.character(TSA_COVID_BTC$Date),format = "%Y-%m-%d")
+TLT_DJIA_NDX_GOLD_OIL$Date<-as.Date(as.character(TLT_DJIA_NDX_GOLD_OIL$Date),format = "%Y-%m-%d")
+GDP_Uneployment$Date<-as.Date(as.character(GDP_Uneployment$Date),format = "%Y-%m-%d")
+
+#Data Stats
+Stats1<- TSA_COVID_BTC[-1]
+TSA_COVID_BTC_Stats<-stat.desc(Stats1)
+format(TSA_COVID_BTC_Stats,scientific=FALSE)
+
+
+Stats2<- TLT_DJIA_NDX_GOLD_OIL[-1]
+TLT_DJIA_NDX_GOLD_OIL_Stats<-stat.desc(Stats2)
+format(TLT_DJIA_NDX_GOLD_OIL_Stats,scientific=FALSE)
+
+Stats3<- GDP_Uneployment[-1]
+GDP_Uneployment_Stats<-stat.desc(Stats3)
+format(GDP_Uneployment_Stats,scientific=FALSE)
+
+#Time Series for TSA and COVID
+ggplot(data=TSA_COVID_BTC, aes(x=Date, y=TSA)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Cases, y=Deaths)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Cases, y=Rate)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Cases, y=TSA)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Date, y=Deaths, na.rm=TRUE)) +
+  geom_line()
+```
+
+\#\#\#Nasdaq, Gold and Oil (Dan) \* Load in datasets for Nasdaq (NDX),
+Gold, Oil futures and Covid data \* Explore and compare visually, look
+for outliers and anything interesting
+
+```{r}
+# Load in datasets
+Covid <- read_excel("Clean Project Data-Based on Date.xlsx", 1)
+NDX_Gold_Oil <- read_excel("Clean Project Data-Based on Date.xlsx", 2)
+
+# Format the dates
+Covid$Date <- as.Date(as.character(Covid$Date), format = "%Y-%m-%d")
+NDX_Gold_Oil$Date <- as.Date(as.character(NDX_Gold_Oil$Date), format = "%Y-%m-%d")
+
+# Combine datasets
+Covid_NDX_Gold_Oil <- merge(Covid[, c("Date", "Cases", "Rate", "Deaths")], NDX_Gold_Oil[, c("Date", "NDX", "Gold", "Oil")], by = "Date")
+
+# Check the dataset
+head(Covid_NDX_Gold_Oil)
+tail(Covid_NDX_Gold_Oil)
+
+
+# Summarize the datasets
+summary(Covid_NDX_Gold_Oil)
+
+# Visualize and explore the datasets
+
+# Played around here.  This did not prove very useful all in one plot.
+#colors <- c("Deaths" = "red", "Cases" = "green", "NDX" = "blue", "Gold" = "yellow", "Oil" = "black")
+#ggplot(Covid_NDX_Gold_Oil, aes(x = Date)) +
+#  geom_line(aes(y = NDX, color = "NDX")) +
+#  geom_line(aes(y = Gold, color = "Gold")) +
+#  geom_line(aes(y = Oil, color = "Oil")) +
+#  geom_line(aes(y = Deaths, color = "Deaths")) +
+#  geom_line(aes(y = Cases, color = "Cases")) +
+#  labs(title="Nasdaq, Gold and Oil with Covid Cases and Deaths", x ="Date", y = "Price", color = "Legend") +
+#  scale_color_manual(values = colors)
+
+
+ggplot(Covid_NDX_Gold_Oil, aes(x = Date, y = Deaths, na.rm = TRUE)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Date, y = NDX)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Date, y = Gold)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Date, y = Oil)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Cases, y = NDX)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Cases, y = Gold)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Cases, y = Oil)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Deaths, y = NDX)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Deaths, y = Gold)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Deaths, y = Oil)) +
+  geom_line()
+ggplot(Covid_NDX_Gold_Oil, aes(x = Cases, y = Deaths)) +
+  geom_line()
+
+```
+
+\#\#\#Dow, XBT and Macroeconomic (Naveen) \* Load in datasets for Dow,
+XBT and macro data \* Explore and compare visually, look for outliers
+and anything interesting
+
+```{r}
+library(ggpubr)
+#Combine data set
+
+# Load in datasets
+Covid_BTC_DS <- read_excel("Clean Project Data-Based on Date.xlsx", 1)
+SPX_DOW_DS <- read_excel("Clean Project Data-Based on Date.xlsx", 2)
+MACRO_DS <- read_excel("Clean Project Data-Based on Date.xlsx", 3)
+
+# Format the dates
+Covid_BTC_DS$Date <- as.Date(as.character(Covid_BTC_DS$Date), format = "%Y-%m-%d")
+SPX_DOW_DS$Date <- as.Date(as.character(SPX_DOW_DS$Date), format = "%Y-%m-%d")
+MACRO_DS$Date <- as.Date(as.character(MACRO_DS$Date), format = "%Y-%m-%d")
+
+# Combine datasets
+COVID_BTC_SPX_DOW <- right_join(Covid_BTC_DS, SPX_DOW_DS, by = "Date")
+
+COVID_BTC_SPX_DOW_MAC <- left_join(COVID_BTC_SPX_DOW,MACRO_DS,by = "Date")
+
+COVID_BTC_SPX_DOW_MAC <- tibble(COVID_BTC_SPX_DOW_MAC)
+
+# Check the dataset
+head(COVID_BTC_SPX_DOW_MAC)
+tail(COVID_BTC_SPX_DOW_MAC)
+
+
+# SPX Plot
+plot1<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Date, y = Cases)) +
+  geom_line() 
+plot2<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Date, y = Deaths)) +
+  geom_line() 
+plot3<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Date, y = SPX)) +
+  geom_line()
+plot4<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Date, y = Bitcoin)) +
+  geom_line()
+plot5<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Date, y = DJIA)) +
+  geom_line()
+plot6 <- COVID_BTC_SPX_DOW_MAC %>% filter(GDP>0) %>% ggplot(aes(x = Date, y = GDP)) +
+  geom_line()
+plot7 <- COVID_BTC_SPX_DOW_MAC %>% filter(Unemployment>0) %>% ggplot(aes(x = Date, y = Unemployment)) +
+  geom_line()
+
+ggarrange(plot1,plot2,plot3,plot4,plot5,plot6,plot7,nrow = 4, ncol=2)
+
+
+plot8<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Cases, y = SPX, na.rm = TRUE)) +
+  geom_line() 
+plot9<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Cases, y = Bitcoin, na.rm = TRUE)) +
+  geom_line() 
+plot10<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Cases, y = DJIA, na.rm = TRUE)) +
+  geom_line() 
+plot11<- COVID_BTC_SPX_DOW_MAC %>% filter(GDP>0) %>% ggplot( aes(x = Cases, y = GDP, na.rm = TRUE)) +
+  geom_line() 
+plot12<- COVID_BTC_SPX_DOW_MAC %>% filter(GDP>0) %>% ggplot( aes(x = Cases, y = Unemployment, na.rm = TRUE)) +
+  geom_line() 
+ggarrange(plot8,plot9,plot10,plot11,plot12,nrow = 3, ncol=2)
+
+plot13<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Deaths, y = SPX, na.rm = TRUE)) +
+  geom_line() 
+plot14<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Deaths, y = Bitcoin, na.rm = TRUE)) +
+  geom_line() 
+plot15<-ggplot(COVID_BTC_SPX_DOW_MAC, aes(x = Deaths, y = DJIA, na.rm = TRUE)) +
+  geom_line() 
+plot16<- COVID_BTC_SPX_DOW_MAC %>% filter(GDP>0) %>% ggplot( aes(x = Deaths, y = GDP, na.rm = TRUE)) +
+  geom_line() 
+plot17<- COVID_BTC_SPX_DOW_MAC %>% filter(GDP>0) %>% ggplot( aes(x = Deaths, y = Unemployment, na.rm = TRUE)) +
+  geom_line() 
+ggarrange(plot13,plot14,plot15,plot16,plot17,nrow = 3, ncol=2)
+
+```
+
+-   Using forward selection, backward selection, and both forward and
+    backward selction to find the best model for NDX, Gold and Oil price
+-   Evaluate whether this model makes sense and test
+
+###Covid and TSA Datasets (Gurj)
+* Summarize all of the datasets
+* Load in datasets for TSA and Covid data
+* Explore and compare visually, look for outliers and anything interesting
+
+```{r}
+#Load Libraries
+library('gdata')
+library('ggplot2')
+library('plyr')
+library('doBy')
+library('readxl') 
+library('pastecs')
+
+#Load the Libraries
+TSA_COVID_BTC <- read_excel("Clean Project Data-Based on Date.xlsx",1)
+TLT_DJIA_NDX_GOLD_OIL<-read_excel("Clean Project Data-Based on Date.xlsx",2)
+GDP_Uneployment<-read_excel("Clean Project Data-Based on Date.xlsx",3)
+
+#Coverting to Dates
+TSA_COVID_BTC$Date<-as.Date(as.character(TSA_COVID_BTC$Date),format = "%Y-%m-%d")
+TLT_DJIA_NDX_GOLD_OIL$Date<-as.Date(as.character(TLT_DJIA_NDX_GOLD_OIL$Date),format = "%Y-%m-%d")
+GDP_Uneployment$Date<-as.Date(as.character(GDP_Uneployment$Date),format = "%Y-%m-%d")
+
+#Data Stats
+Stats1<- TSA_COVID_BTC[-1]
+TSA_COVID_BTC_Stats<-stat.desc(Stats1)
+format(TSA_COVID_BTC_Stats,scientific=FALSE)
+
+
+Stats2<- TLT_DJIA_NDX_GOLD_OIL[-1]
+TLT_DJIA_NDX_GOLD_OIL_Stats<-stat.desc(Stats2)
+format(TLT_DJIA_NDX_GOLD_OIL_Stats,scientific=FALSE)
+
+Stats3<- GDP_Uneployment[-1]
+GDP_Uneployment_Stats<-stat.desc(Stats3)
+format(GDP_Uneployment_Stats,scientific=FALSE)
+
+#Time Series for TSA and COVID
+ggplot(data=TSA_COVID_BTC, aes(x=Date, y=TSA)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Cases, y=Deaths)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Cases, y=Rate)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Cases, y=TSA)) +
+  geom_line()
+ggplot(data=TSA_COVID_BTC, aes(x=Date, y=Deaths, na.rm=TRUE)) +
+  geom_line()
+
+#Combine the Data
+ALLdata<-left_join(TLT_DJIA_NDX_GOLD_OIL,TSA_COVID_BTC,by = "Date")
+Dataall<-left_join(ALLdata,GDP_Uneployment, by= "Date")
+Dataall$Cases[is.na(Dataall$Cases)] = 0
+Dataall$Rate[is.na(Dataall$Rate)] = 0
+Dataall$Deaths[is.na(Dataall$Deaths)] = 0
+Dataall$Date<-as.Date(as.character(Dataall$Date),format = "%Y-%m-%d")
+#Insert the GDP data
+Dataall[1:40,12]<-	21487.90
+Dataall[41:104,12]<-	21170.25
+Dataall[105:168,12]<-19520.11
+Dataall[169:231,12]<-21561.14
+Dataall[232:293,12]<-21747.39
+Dataall[294:357,12]<-21540.32
+Dataall[358:420,12]<-21329.88
+Dataall[421:483,12]<-21115.31
+Dataall[484:544,12]<-20909.85
+#Insert the Unemployment data
+
+Dataall[1:40,13]<-	6.77
+Dataall[41:104,13]<-	8.80
+Dataall[105:168,13]<-13.07
+Dataall[169:231,13]<-3.80
+Dataall[232:293,13]<-3.60
+Dataall[294:357,13]<-3.60
+Dataall[358:420,13]<-3.67
+Dataall[421:483,13]<-3.87
+Dataall[484:544,13]<-3.83
+
+CovidonlyData<-subset(Dataall, Date >"2020-01-21")
+
+
+#Create three separate models for each index, one for covid only data and one for after
+#Will be making GAM Models
+library("gam")
+#NDX Model
+NDXGAM<-gam(NDX ~ s(TLT)+s(DJIA)+s(Gold)+s(Oil)+s(TSA)+s(Cases)+s(Rate)+s(Deaths)+s(Bitcoin)+s(GDP)+s(Unemployment), data = Dataall)
+summary(NDXGAM)
+coef(NDXGAM)
+plot.Gam(NDXGAM)
+#Covid only NDX model
+NDXGAMcovid<-gam(NDX ~ s(TLT)+s(DJIA)+s(Gold)+s(Oil)+s(TSA)+s(Cases)+s(Rate)+s(Deaths)+s(Bitcoin)+s(GDP)+s(Unemployment), data = CovidonlyData)
+summary(NDXGAMcovid)
+coef(NDXGAMcovid)
+plot.Gam(NDXGAMcovid,residuals = TRUE)
+#DJIA Model
+DJIAGAM<-gam(NDX ~ s(TLT)+s(NDX)+s(Gold)+s(Oil)+s(TSA)+s(Cases)+s(Rate)+s(Deaths)+s(Bitcoin)+s(GDP)+s(Unemployment), data = Dataall)
+summary(DJIAGAM)
+coef(DJIAGAM)
+plot.Gam(DJIAGAM,se=TRUE)
+#DJIA Covid Model
+DJIAGAMcovid<-gam(NDX ~ s(TLT)+s(NDX)+s(Gold)+s(Oil)+s(TSA)+s(Cases)+s(Rate)+s(Deaths)+s(Bitcoin)+s(GDP)+s(Unemployment), data = CovidonlyData)
+summary(DJIAGAMcovid)
+coef(DJIAGAMcovid)
+plot.Gam(DJIAGAMcovid,se=TRUE)
+```
+
+
+
+```{r}
+library(quantmod)
+
+# Build multiple regression model for all three factors of Covid vs. NDX price and summarize
+NDX.model <- lm(NDX ~ Deaths + Cases + Rate, data = Covid_NDX_Gold_Oil)
+summary(NDX.model)
+
+# Build null model for NDX taste and summarize
+NDX.null <- lm(NDX ~ 1, data = Covid_NDX_Gold_Oil)
+summary(NDX.null)
+
+# Set up scope for searching model
+NDX.model.formula <- NDX ~ Deaths + Cases + Rate
+
+# Evaluate model using forward selection
+# step(NDX.null, NDX.model.formula, direction = "forward") # Due to missing/NA values, Forward will have issues.
+
+# Evaluate model using bacward selection
+step(NDX.model, NDX.model.formula, direction = "backward")
+
+# Evaluate model using both
+# step(NDX.null, NDX.model.formula, direction = "both") # Due to missing/NA values, Forward will have issues.
+
+
+# Repeat for Gold
+Gold.model <- lm(Gold ~ Deaths + Cases + Rate, data = Covid_NDX_Gold_Oil)
+Gold.null <- lm(Gold ~ 1, data = Covid_NDX_Gold_Oil)
+Gold.model.formula <- Gold ~ Deaths + Cases + Rate
+step(Gold.model, Gold.model.formula, direction = "backward")
+
+# Repeat for Oil
+Oil.model <- lm(Oil ~ Deaths + Cases + Rate, data = Covid_NDX_Gold_Oil)
+Oil.null <- lm(Oil ~ 1, data = Covid_NDX_Gold_Oil)
+Oil.model.formula <- Oil ~ Deaths + Cases + Rate
+step(Oil.model, Oil.model.formula, direction = "backward")
+```
+
+Based on this criteria, the best model for each price are the following:
+$$NDX = 8.358e{03} + 1.537e{-02} * Deaths - 8.345e{-05} * Cases + 1.926e{00} * Rate$$
+$$Gold = 1.584e{03} + 2.685e{-03} * Deaths - 4.071e{-05} * Cases + 3.586e{-01} * Rate$$
+$$Oil = 4.248e{01} - 5.137e{-05} * Deaths + 1.642e{-06} * Cases - 1.836e{-02} * Rate$$
+These models probably are not very good.
+
+
+###Modeling: LDA, QDA, KNN (Dan)
+**Data Prep**
+```{r}
+library(tidyverse)
+library(readxl)
+library(GGally)
+library(MASS)
+library(class)
+
+# Load in datasets
+Covid <- read_excel("Clean Project Data-Based on Date_lazyDan.xlsx", 1)
+NDX_Gold_Oil_GDP_Unemployment <- read_excel("Clean Project Data-Based on Date_lazyDan.xlsx", 2)
+
+# Format the dates
+Covid$Date <- as.Date(as.character(Covid$Date), format = "%Y-%m-%d")
+NDX_Gold_Oil_GDP_Unemployment$Date <- as.Date(as.character(NDX_Gold_Oil_GDP_Unemployment$Date), format = "%Y-%m-%d")
+
+# Combine datasets
+allData <- merge(NDX_Gold_Oil_GDP_Unemployment, Covid, by = "Date")
+allData$Cases[is.na(allData$Cases)] = 0
+allData$Rate[is.na(allData$Rate)] = 0
+allData$Deaths[is.na(allData$Deaths)] = 0
+allData <- allData[!is.na(allData$NDX), ]
+
+# Calculate daily log return of NDX
+allData <- allData[nrow(allData):1, ]
+NDX.rtn <- diff(log(allData$NDX))
+head(NDX.rtn)
+NDX.rtn <- c(NDX.rtn, "N/A")
+allData <- cbind(allData, NDX.rtn)
+allData$NDX.rtn01[NDX.rtn > 0] <- 1
+allData$NDX.rtn01[NDX.rtn <= 0] = 0
+
+# Explore data with ggpairs()
+head(allData)
+ggpairs(allData, columns = c(1:14), progress = FALSE)
+
+```
+
+
+**LDA, QDA, KNN trained with all data, Covid predictors only**
+```{r}
+# Create training and test datases based on all data
+dt <- sort(sample(nrow(allData), nrow(allData) * .7))
+train <- allData[dt, ]
+test <- allData[-dt, ]
+
+# LDA, QDA and KNN using all data and just Cases, Rate and Deaths as predictors
+ldaNDX <- lda(NDX.rtn01 ~ Cases + Rate + Deaths, data = train)
+ldaNDX
+ldapredictionNDX <- predict(ldaNDX, newdata = test, type = "response")
+tab <- table(ldapredictionNDX$class, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+qdaNDX <- qda(NDX.rtn01 ~ Cases + Rate + Deaths, data = train)
+qdaNDX
+qdapredictionNDX <- predict(qdaNDX, newdata = test, type = "response")
+tab <- table(qdapredictionNDX$class, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+# KNN using k=1
+knnNDX1 <- knn(data.frame(train[, c("Cases", "Rate", "Deaths")]), data.frame(test[, c("Cases", "Rate", "Deaths")]), train$NDX.rtn01, k = 1)
+tab <- table(knnNDX1, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+# KNN using k=100
+knnNDX100 <- knn(data.frame(train[, c("Cases", "Rate", "Deaths")]), data.frame(test[, c("Cases", "Rate", "Deaths")]), train$NDX.rtn01, k = 100)
+tab <- table(knnNDX100, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+```
+
+
+**LDA, QDA, KNN trained with all data**
+```{r}
+# LDA, QDA and KNN using all data and SPX, Gold, TSA, Unemployment, Deaths and Cases as predictors
+ldaNDX <- lda(NDX.rtn01 ~ SPX + Gold + TSA + Unemployment + Deaths + Cases, data = train)
+ldaNDX
+ldapredictionNDX <- predict(ldaNDX, newdata = test, type = "response")
+tab <- table(ldapredictionNDX$class, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+qdaNDX <- qda(NDX.rtn01 ~ SPX + Gold + TSA + Unemployment + Deaths + Cases, data = train)
+qdaNDX
+qdapredictionNDX <- predict(qdaNDX, newdata = test, type = "response")
+tab <- table(qdapredictionNDX$class, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+# KNN using k=1
+knnNDX1 <- knn(data.frame(train[, c("SPX", "Gold", "TSA", "Unemployment", "Deaths", "Cases")]), data.frame(test[, c("SPX", "Gold", "TSA", "Unemployment", "Deaths", "Cases")]), train$NDX.rtn01, k = 1)
+tab <- table(knnNDX1, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+# KNN using k=100
+knnNDX100 <- knn(data.frame(train[, c("SPX", "Gold", "TSA", "Unemployment", "Deaths", "Cases")]), data.frame(test[, c("SPX", "Gold", "TSA", "Unemployment", "Deaths", "Cases")]), train$NDX.rtn01, k = 100)
+tab <- table(knnNDX100, test$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(test)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+```
+
+**LDA, QDA, KNN trained with pre-Covid data**
+```{r}
+# Create training and test datasets based on precovid
+CovidonlyData<-subset(allData, Date >"2020-01-21")
+NoCovidData<-subset(allData, Date <= "2020-01-21")
+
+# LDA, QDA and KNN using precovid data and SPX, Gold, TSA, Unemployment, as predictors
+ldaNDX <- lda(NDX.rtn01 ~ SPX + Gold + TSA + Unemployment, data = NoCovidData)
+ldaNDX
+ldapredictionNDX <- predict(ldaNDX, newdata = CovidonlyData, type = "response")
+tab <- table(ldapredictionNDX$class, CovidonlyData$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(CovidonlyData)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+qdaNDX <- qda(NDX.rtn01 ~ SPX + Gold + TSA + Unemployment, data = NoCovidData)
+qdaNDX
+qdapredictionNDX <- predict(ldaNDX, newdata = CovidonlyData, type = "response")
+tab <- table(qdapredictionNDX$class, CovidonlyData$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(CovidonlyData)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+# KNN using k=1
+knnNDX1 <- knn(data.frame(NoCovidData[, c("SPX", "Gold", "TSA", "Unemployment")]), data.frame(CovidonlyData[, c("SPX", "Gold", "TSA", "Unemployment")]), NoCovidData$NDX.rtn01, k = 1)
+tab <- table(knnNDX1, CovidonlyData$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(CovidonlyData)[1])*100, 3)
+paste("Error rate: ", error, "%")
+
+# KNN using k=100
+knnNDX100 <- knn(data.frame(NoCovidData[, c("SPX", "Gold", "TSA", "Unemployment")]), data.frame(CovidonlyData[, c("SPX", "Gold", "TSA", "Unemployment")]), NoCovidData$NDX.rtn01, k = 100)
+tab <- table(knnNDX100, CovidonlyData$NDX.rtn01)
+tab
+error <- signif((sum(tab[1,2], tab[2,1])/dim(CovidonlyData)[1])*100, 3)
+paste("Error rate: ", error, "%")
+```
+
+
+
+#### Random Forest and Step function implementation
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+options(scipen=999)
+library('gdata')
+library('ggplot2')
+library('plyr')
+library('doBy')
+library('readxl') 
+library('pastecs')
+library(ggpubr)
+library(ISLR)
+library(splines)
+library(gam)
+library(tree)
+library(randomForest)
+library(corrplot)
+library(GGally)
+library(quantmod)
+library(fBasics)
+library(xts)
+library(vars)
+library(marima)
+read_excel("Clean Project Data-Based on Date.xlsx", 1)
+
+# Load in datasets
+Covid_BTC_DS <- read_excel("Clean Project Data-Based on Date.xlsx", 1)
+SPX_DOW_DS <- read_excel("Clean Project Data-Based on Date.xlsx", 2)
+MACRO_DS <- read_excel("Clean Project Data-Based on Date.xlsx", 3)
+
+# Format the dates
+Covid_BTC_DS$Date <- as.Date(as.character(Covid_BTC_DS$Date), format = "%Y-%m-%d")
+SPX_DOW_DS$Date <- as.Date(as.character(SPX_DOW_DS$Date), format = "%Y-%m-%d")
+MACRO_DS<- rbind(MACRO_DS,c('2021-03-02',0,0,0))
+MACRO_DS$Date <- as.Date(as.character(MACRO_DS$Date), format = "%Y-%m-%d")
+MACRO_DS$GDP<-as.numeric(MACRO_DS$GDP)
+MACRO_DS$Unemployment<-as.numeric(MACRO_DS$Unemployment)
+
+MACRO_DS<- MACRO_DS %>%
+  complete(Date = seq.Date(min(Date), max(Date), by="day")) %>% fill('GDP') %>% fill('Unemployment') 
+
+
+# Combine datasets
+covid.full.ds <- right_join(Covid_BTC_DS, SPX_DOW_DS, by = "Date")
+covid.full.ds <- left_join(covid.full.ds,MACRO_DS,by = "Date")
+
+# replacing NA with 0
+covid.full.ds<- covid.full.ds %>%
+  mutate(Cases = if_else(is.na(Cases), 0, Cases)) %>%
+  mutate(Deaths = if_else(is.na(Deaths), 0, Deaths))
+
+summary(covid.full.ds)
+
+# Check the dataset
+head(covid.full.ds)
+tail(covid.full.ds)
+
+ggcorr(covid.full.ds %>% dplyr::select(Date:Cases,Deaths:Unemployment), method = c("everything", "pearson"))
+
+
+covid.full.ds<- covid.full.ds %>% dplyr::mutate(rnum = row_number())
+
+covid.full.ds<-covid.full.ds %>% arrange(Date)
+
+# calculate retursn and diff
+covid.full.ds<-data.frame(covid.full.ds %>% arrange(Date) %>% dplyr::select(Date:rnum),
+                          c(0,diff(covid.full.ds$Cases)),
+                          c(0,diff(covid.full.ds$Deaths)),
+                          c(0,diff(log(covid.full.ds$SPX))),
+                          c(0,diff(log(covid.full.ds$Bitcoin))),
+                          c(0,diff(log(covid.full.ds$DJIA))),
+                          c(0,diff(log(covid.full.ds$NDX))),
+                          c(0,diff(log(covid.full.ds$TLT))),
+                          c(0,diff(log(covid.full.ds$Gold))),
+                          c(0,diff(log(covid.full.ds$Oil)))
+) %>% arrange(Date)
+names(covid.full.ds)[16]<-"Cases.diff"
+names(covid.full.ds)[17]<-"Deaths.diff"
+names(covid.full.ds)[18]<-"SPX.ret"
+names(covid.full.ds)[19]<-"Bitcoin.ret"
+names(covid.full.ds)[20]<-"DJIA.ret"
+names(covid.full.ds)[21]<-"NDX.ret"
+names(covid.full.ds)[22]<-"TLT.ret"
+names(covid.full.ds)[23]<-"Gold.ret"
+names(covid.full.ds)[24]<-"Oil.ret"
+
+
+#Split into test and train
+covid.full.ds.train <- covid.full.ds %>% dplyr::filter(Date<as.Date("2021-01-10"))
+covid.full.ds.test  <- anti_join(covid.full.ds, covid.full.ds.train, by = 'rnum')
+
+covid.full.ds.train.1<- covid.full.ds.train %>% dplyr::select(Date:Cases,Deaths:Unemployment,Cases.diff:Deaths.diff)
+covid.full.ds.test.1<- covid.full.ds.test %>% dplyr::select(Date:Cases,Deaths:Unemployment,Cases.diff:Deaths.diff)
+
+
+covid.full.ds.train.2<- covid.full.ds.train %>% dplyr::select(Date,Cases.diff:Deaths.diff,GDP,Unemployment,SPX.ret:Oil.ret) %>% dplyr::filter(Date>as.Date("2019-01-02"))
+covid.full.ds.test.2<- covid.full.ds.test %>% dplyr::select(Date,Cases.diff:Deaths.diff,GDP,Unemployment,SPX.ret:Oil.ret) 
+
+pairs(covid.full.ds.train %>% dplyr::select(Date:Cases,Deaths:Unemployment))
+#cor(covid.full.ds.train %>% dplyr::select(Date:Cases,Deaths:Unemployment))
+
+#corrplot(covid.full.ds.train.1 , method="number", use="complete.obs", is.corr=F)
+
+tail(covid.full.ds.test)
+
+#RandomForest
+
+##SPX
+
+set.seed(3)
+rf.covid.spx<-randomForest(SPX~.,data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,-c(NDX,DJIA,Bitcoin)), 
+                           mtry=4, importance=TRUE)
+yhat.rf.spx<-predict(rf.covid.spx, newdata = covid.full.ds.test.1)
+mean((yhat.rf.spx-covid.full.ds.test.1$SPX)^2)
+importance(rf.covid.spx)
+varImpPlot(rf.covid.spx)
+
+##Bitcoin
+rf.covid.bitcoin<-randomForest(Bitcoin~.,data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,-c(NDX,DJIA,SPX)), 
+                               mtry=4, importance=TRUE)
+yhat.rf.bitcoin<-predict(rf.covid.bitcoin, newdata = covid.full.ds.test.1)
+mean((yhat.rf.bitcoin-covid.full.ds.test.1$Bitcoin)^2)
+importance(rf.covid.bitcoin)
+varImpPlot(rf.covid.bitcoin)
+
+#DJIA
+rf.covid.djia<-randomForest(DJIA~.,data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,-c(NDX,Bitcoin,SPX)), 
+                            mtry=4, importance=TRUE)
+yhat.rf.djia<-predict(rf.covid.djia, newdata = covid.full.ds.test.1)
+mean((yhat.rf.djia-covid.full.ds.test.1$DJIA)^2)
+importance(rf.covid.djia)
+varImpPlot(rf.covid.djia)
+
+
+#NDX
+rf.covid.ndx<-randomForest(NDX~.,data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,-c(DJIA,Bitcoin,SPX)), 
+                           mtry=4, importance=TRUE)
+yhat.rf.ndx<-predict(rf.covid.ndx, newdata = covid.full.ds.test.1)
+mean((yhat.rf.ndx-covid.full.ds.test.1$NDX)^2)
+importance(rf.covid.ndx)
+varImpPlot(rf.covid.ndx)
+
+
+#Step Function
+
+#SPX
+
+range(covid.full.ds.test.1$Cases.diff)
+
+step.covid.fit.spx<- gam(SPX~cut(Cases.diff,breaks=c(-1,1,10000,30000,70000,400000,5000000))+
+                           cut(Deaths.diff,breaks=c(-1,1,1000,3000,5000,10000))+TSA+TLT+Unemployment+GDP+Gold+Oil, 
+                         data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,Cases.diff:Deaths.diff,-c(NDX,DJIA,Bitcoin)))
+yhat.step.covid.spx<-predict(step.covid.fit.spx, newdata = covid.full.ds.test.1)
+mean((yhat.step.covid.spx-covid.full.ds.test.1$SPX)^2)
+par(mfrow=c(1,1))
+plot(yhat.step.covid.spx, se=TRUE,col="blue")
+
+#Bitcoin
+step.covid.fit.btc<- gam(Bitcoin~cut(Cases.diff,breaks=c(-1,1,10000,30000,70000,400000,900000))+
+                           cut(Deaths.diff,breaks=c(-1,1,1000,3000,5000,10000))+TSA+TLT+Unemployment+GDP+Gold+Oil, 
+                         data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,Cases.diff:Deaths.diff,-c(NDX,DJIA,SPX)))
+yhat.step.covid.btc<-predict(step.covid.fit.btc, newdata = covid.full.ds.test.1)
+mean((yhat.step.covid.btc-covid.full.ds.test.1$Bitcoin)^2)
+par(mfrow=c(1,1))
+plot(yhat.step.covid.btc, se=TRUE,col="blue")
+
+#DJIA
+step.covid.fit.djia<- gam(DJIA~cut(Cases.diff,breaks=c(-1,1,10000,30000,70000,400000,900000))+
+                            cut(Deaths.diff,breaks=c(-1,1,1000,3000,5000,10000))+TSA+TLT+Unemployment+GDP+Gold+Oil, 
+                          data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,Cases.diff:Deaths.diff,-c(NDX,Bitcoin,SPX)))
+yhat.step.covid.djia<-predict(step.covid.fit.djia, newdata = covid.full.ds.test.1)
+mean((yhat.step.covid.djia-covid.full.ds.test.1$DJIA)^2)
+par(mfrow=c(1,1))
+plot(yhat.step.covid.djia, se=TRUE,col="blue")
+
+#NDX
+step.covid.fit.ndx<- gam(NDX~cut(Cases.diff,breaks=c(-1,1,10000,30000,70000,400000,900000))+
+                           cut(Deaths.diff,breaks=c(-1,1,1000,3000,5000,10000))+TSA+TLT+Unemployment+GDP+Gold+Oil, 
+                         data=covid.full.ds.train.1 %>% dplyr::select(TSA:Unemployment,Cases.diff:Deaths.diff,-c(DJIA,Bitcoin,SPX)))
+yhat.step.covid.ndx<-predict(step.covid.fit.ndx, newdata = covid.full.ds.test.1)
+mean((yhat.step.covid.ndx-covid.full.ds.test.1$NDX)^2)
+par(mfrow=c(1,1))
+plot(yhat.step.covid.djia, se=TRUE,col="blue")
+
+
+```
+

@@ -1,0 +1,156 @@
+---
+title: "HW1 - Problem 2"
+author: "Naveen Nagarajan"
+date: "2/15/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("ggplot2")
+library('gdata')
+library('dplyr')
+library('lubridate')
+perl<-"C:\\Strawberry/perl/bin/perl.exe"
+options(scipen=999)
+knitr::opts_knit$set(root.dir = 'HW1_S21/')
+knitr::opts_chunk$set(tidy = TRUE) 
+knitr::opts_chunk$set(warning = FALSE) 
+knitr::opts_chunk$set(echo = FALSE) 
+```
+
+### Problem 2
+
+The datasets provided nyt1.csv, nyt2.csv, and nyt3.csv represents three (simulated) days of ads shown and clicks recorded on the New York Times homepage. Each row represents a single user. There are 5 columns: age, gender (0=female, 1=male), number impressions, number clicks, and logged-in. Use R to handle this data. Perform some exploratory data analysis:
+
+  * Create a new variable, age_group, that categorizes users as “<20”, “20-29”, “30-39”, “40-49”, “50-59”, “60-69”, and “70+”.
+  * For each day:
+    + Plot the distribution of number of impressions and click-through-rate (CTR = #clicks / #impressions) for these age categories
+    +  Define a new variable to segment or categorize users based on their click behavior.
+    +  Explore the data and make visual and quantitative comparisons across user segments/demographics (<20-year-old males versus <20-year-old females or logged-in versus not, for example).
+  * Extend your analysis across days. Visualize some metrics and distributions over time.
+
+```{r load, cache=TRUE, include=FALSE}
+nyt1<-read.csv("nyt1.csv")
+nyt2<-read.csv("nyt2.csv")
+nyt3<-read.csv("nyt3.csv")
+
+nyt1$day<-"Day-1"
+nyt2$day<-"Day-2"
+nyt3$day<-"Day-3"
+
+nytset<-dplyr::bind_rows(nyt1,nyt2,nyt3)
+```
+
+#### Solution
+
+* Summary
+
+```{r summary}
+dssummary<-data.frame("Day"=c("Day1","Day2","Day3","Total"),
+                      "Count"=c(count(nyt1)[[1]],
+                                count(nyt2)[[1]],
+                                count(nyt3)[[1]],
+                                count(nytset)[[1]]))
+knitr::kable(dssummary, col.names = gsub("[.]", " ", names(dssummary)))
+
+names(nytset)<-tolower(names(nytset))
+summary(nytset)
+```
+
+* Create category age group, factor days and rename gender
+
+```{r agecat}
+nytset$day<-as.factor(nytset$day)
+nytset<- nytset %>% mutate(gender=case_when(gender=="0" ~ "Female", gender=="1"~"Male"))
+nytset$gender<-as.factor(nytset$gender)
+nytset$age_group<-cut(nytset$age, c(-Inf,19,29,39,49,59,69,+Inf))
+age_cat_label<- c("<20", "20-29","30-39","40-49","50-59","60-69","70+")
+```
+
+* Distribution of impressions and CTR for age categories
+
+```{r CTR}
+
+nytset %>% filter(impressions>0, age>0, clicks >0) %>% 
+  ggplot(mapping = aes(x=age_group,y=impressions)) + geom_boxplot() + 
+  scale_x_discrete(labels=age_cat_label)+
+  facet_wrap(~day,ncol=1)
+nytset %>% filter(impressions>0, age>0, clicks >0) %>% 
+  ggplot(mapping = aes(x=impressions)) + geom_histogram() +
+  facet_wrap(~day,ncol=1)
+nytset %>% filter(impressions>0, age>0, clicks >0) %>% 
+  ggplot(aes(x=clicks,fill=age_group))+geom_density()+
+  scale_x_discrete(labels=age_cat_label)+
+  facet_wrap(~day,ncol=1) 
+
+nytset %>% filter(impressions>0, age>0, clicks >0) %>% 
+  ggplot(mapping = aes(x=age_group,y=clicks/impressions)) + geom_boxplot() + 
+  scale_x_discrete(labels=age_cat_label)+
+  facet_wrap(~day,ncol=1)
+nytset %>% filter(impressions>0, age>0, clicks >0) %>% 
+  ggplot(mapping = aes(x=clicks/impressions)) + geom_histogram() +
+  facet_wrap(~day,ncol=1)
+
+nytset %>% filter(impressions>0, age>0, clicks >0) %>% 
+  ggplot(aes(x=clicks/impressions,fill=age_group))+geom_density()+
+  facet_wrap(~day,ncol=1)  
+  
+nytset %>% filter(clicks>0) %>% group_by(day,age_group) %>% 
+  summarise(CTR=(sum(clicks)/sum(impressions))*100, ttlclick=sum(clicks),ttlimps=sum(impressions)) %>%
+  ggplot(mapping = aes(x=age_group,y=CTR)) + 
+  geom_col( color="black", width=0.4,mapping=aes(fill=day), position = position_dodge(width = 0.5)) +
+  scale_x_discrete(labels=age_cat_label)+
+  xlab(label = "Age Group")+
+  facet_wrap(~day,ncol=1)
+```
+
+* Categorize based on Clicked, Not Clicked
+```{r categorize clicks}
+nytset<- nytset %>% mutate(click_cat=case_when(clicks>0 ~ "Clicked", clicks<=0 ~ "Not Clicked"))
+nytset$click_cat<-as.factor(nytset$click_cat)
+summary(nytset$click_cat)
+```
+
+* Quantitative comparison across segments/demo
+```{r segment comparison, echo=FALSE, fig.height=10, fig.width=10, fig.align='left'}
+nytset %>% group_by(day,age_group, gender,click_cat) %>% 
+  count(name="counts") %>%
+  ggplot(mapping = aes(x=age_group,y=log(counts) )) + geom_bar(mapping=aes(fill=click_cat),stat="identity", position = "dodge") + 
+  scale_x_discrete(labels=age_cat_label)+
+  facet_wrap(gender~day, ncol =1) + xlab("Age Group")
+```
+
+
+```{r segment comparison2, echo=FALSE}
+nytset %>% filter(clicks>0) %>% group_by(day,age_group, gender) %>% 
+  summarise(CTR=(sum(clicks)/sum(impressions))*100, ttlclick=sum(clicks),ttlimps=sum(impressions)) %>%
+  ggplot(mapping = aes(x=age_group,y=CTR)) + geom_bar(mapping=aes(fill=gender),stat="identity", position = "dodge") + 
+  scale_x_discrete(labels=age_cat_label)+
+  facet_wrap(~day, ncol =1)
+
+nytset %>% filter(clicks>0) %>% group_by(day,gender) %>% 
+  summarise(CTR=(sum(clicks)/sum(impressions))*100, ttlclick=sum(clicks),ttlimps=sum(impressions)) %>%
+  ggplot(mapping = aes(x="",y=CTR)) + geom_bar(mapping=aes(fill=gender),stat="identity", position = "dodge")+
+  facet_wrap(~day, ncol =3)+ylab("Click through rate") + xlab("") +
+  scale_y_continuous(limit=c(0,30))
+```
+
+* Extend analysis across days
+
+```{r days, echo=FALSE}
+nytset %>% filter(clicks>0) %>% 
+  group_by(day, gender) %>% 
+  summarise(CTR=(sum(clicks)/sum(impressions))*100, ttlclick=sum(clicks),ttlimps=sum(impressions)) %>%
+  #filter(gender=="Female") %>%
+  ggplot(mapping = aes(x=day,y=CTR)) + geom_line(mapping=aes(group=gender,color=gender))
+
+
+nytset %>% filter(clicks>0) %>% 
+  group_by(day, age_group) %>% 
+  summarise(CTR=(sum(clicks)/sum(impressions))*100, ttlclick=sum(clicks),ttlimps=sum(impressions)) %>%
+  #filter(gender=="Female") %>%
+  ggplot(mapping = aes(x=age_group,y=CTR)) + 
+  geom_bar(mapping=aes(fill=day), stat="identity", position = "dodge") +
+  scale_x_discrete(labels=age_cat_label)+
+  scale_y_continuous(limit=c(0,50)) + xlab("Age Group") + ylab("Click through rate")
+```

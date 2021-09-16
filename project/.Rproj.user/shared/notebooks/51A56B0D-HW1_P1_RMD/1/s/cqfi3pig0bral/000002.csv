@@ -1,0 +1,14 @@
+"0","library(""xlsx"")
+"
+"2","running command '/usr/libexec/java_home' had status 1"
+"2","The operation couldn’t be completed. Unable to locate a Java Runtime.
+Please visit http://www.java.com for information on installing Java.
+
+"
+"2","Cannot find JVM library 'NA/lib/server/libjvm.dylib'
+Install Java and/or check JAVA_HOME (if in doubt, do NOT set it, it will be detected)"
+"2","Error: package or namespace load failed for ‘xlsx’:
+ .onLoad failed in loadNamespace() for 'rJava', details:
+  call: fun(libname, pkgname)
+  error: JVM could not be found
+"

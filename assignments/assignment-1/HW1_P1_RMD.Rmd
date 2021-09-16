@@ -1,0 +1,171 @@
+---
+title: "HW1 - Problem 1"
+author: "Naveen Nagarajan"
+date: "2/14/2021"
+output: pdf_document
+---
+
+```{r LoadPackages, include=FALSE, cache= FALSE}
+library("ggplot2")
+library("xlsx")
+library('gdata')
+library('dplyr')
+library('formatR')
+library('lubridate')
+options(scipen=999)
+perl<-"C:\\Strawberry/perl/bin/perl.exe"
+#knitr::opts_knit$set(root.dir = 'Z:\\Desktop\\workspace\\stevens-fa\\FE582WS\\assignments\\assignment-1\\HW1_S21')
+knitr::opts_chunk$set(tidy = TRUE) 
+knitr::opts_chunk$set(warning = FALSE) 
+```
+
+
+
+
+
+## Problem 1
+
+Explore realdirect.com thinking about how buyers and sellers would navigate, and how the website is organized. Use the datasets provided for Bronx, Brooklyn, Manhattan, Queens, and Staten Island. Do the following:
+•	Load in and clean the data.
+•	Conduct exploratory data analysis in order to find out where there are outliers or missing values, decide how you will treat them, make sure the dates are formatted correctly, make sure values you think are numerical are being treated as such, etc.
+•	Conduct exploratory data analysis to visualize and make comparisons for residential building category classes across boroughs and across time (select the following: 1-, 2-, and 3-family homes, coops, and condos). Use histograms, boxplots, scatterplots or other visual graphs. Provide summary statistics along with your conclusions.
+
+
+### Load and clean data sets 
+
+```{r loaddata, include=FALSE, cache=TRUE}
+brooklyn<- read.xls("rollingsales_brooklyn.xls", 1,pattern="BOROUGH",perl=perl)
+bronx<- read.xls("rollingsales_bronx.xls", 1,pattern="BOROUGH",perl=perl)
+manhattan<- read.xls("rollingsales_manhattan.xls", 1,pattern="BOROUGH",perl=perl)
+queens<- read.xls("rollingsales_queens.xls", 1,pattern="BOROUGH",perl=perl)
+statenisland<-read.xls("rollingsales_statenisland.xls",1,pattern="BOROUGH",perl=perl)
+
+brooklyn$RESIDENTIAL.UNITS<-as.numeric(brooklyn$RESIDENTIAL.UNITS)
+bronx$RESIDENTIAL.UNITS<-as.numeric(bronx$RESIDENTIAL.UNITS)
+manhattan$RESIDENTIAL.UNITS<-as.numeric(manhattan$RESIDENTIAL.UNITS)
+queens$RESIDENTIAL.UNITS<-as.numeric(queens$RESIDENTIAL.UNITS)
+statenisland$RESIDENTIAL.UNITS<-as.numeric(statenisland$RESIDENTIAL.UNITS)
+
+brooklyn$TOTAL.UNITS<-as.numeric(brooklyn$TOTAL.UNITS)
+bronx$TOTAL.UNITS<-as.numeric(bronx$TOTAL.UNITS)
+manhattan$TOTAL.UNITS<-as.numeric(manhattan$TOTAL.UNITS)
+queens$TOTAL.UNITS<-as.numeric(queens$TOTAL.UNITS)
+statenisland$TOTAL.UNITS<-as.numeric(statenisland$TOTAL.UNITS)
+
+brooklyn$COMMERCIAL.UNITS<-as.numeric(brooklyn$COMMERCIAL.UNITS)
+bronx$COMMERCIAL.UNITS<-as.numeric(bronx$COMMERCIAL.UNITS)
+manhattan$COMMERCIAL.UNITS<-as.numeric(manhattan$COMMERCIAL.UNITS)
+queens$COMMERCIAL.UNITS<-as.numeric(queens$COMMERCIAL.UNITS)
+statenisland$COMMERCIAL.UNITS<-as.numeric(statenisland$COMMERCIAL.UNITS)
+
+#merge data
+bdset<-dplyr::bind_rows(bronx,brooklyn,manhattan,queens,statenisland)
+names(bdset)<-tolower(names(bdset))
+bdset$borough[bdset$borough=="1"]<-"manhattan"
+bdset$borough[bdset$borough=="2"]<-"bronx"
+bdset$borough[bdset$borough=="3"]<-"brooklyn"
+bdset$borough[bdset$borough=="4"]<-"queens"
+bdset$borough[bdset$borough=="5"]<-"statenisland"
+
+```
+
+### Total records loaded for individual boroughs
+
+```{r totalrecords,include=TRUE, tidy=TRUE}
+dssummary<-data.frame("Borough"=c("Bronx","Brooklyn","Manhattan","Queens","Staten Island","Total"),
+           "Count"=c(count(bronx)[[1]],
+                     count(brooklyn)[[1]],
+                     count(manhattan)[[1]],
+                     count(queens)[[1]],
+                     count(statenisland)[[1]],
+                     count(bdset)[[1]]))
+knitr::kable(dssummary, col.names = gsub("[.]", " ", names(dssummary)))
+```
+
+Summary of stats on the data frame displays class of sale price, gross. Sq. ft, land. Sq. Ft and sale date is character. Transformation needs to be applied to convert these to numeric and date fields respectively
+
+```{r summ}
+summary(bdset)
+
+```
+
+Define types and format date
+
+```{r types}
+#define types - numeric, date
+bdset$land.square.feet <- as.numeric(gsub("[^[:digit:]]","",bdset$land.square.feet))
+bdset$gross.square.feet <- as.numeric(bdset$gross.square.feet)
+bdset$sale.price <- as.numeric(gsub("[^[:digit:]]","",bdset$sale.price))
+bdset$sale.date <- as.Date(bdset$sale.date)
+bdset$building.class.category<-trim(bdset$building.class.category)
+
+summary(bdset)
+```
+
+Missing values
+```{r missingvalues}
+# missing values
+unique(bdset$building.class.category)
+bdset<-bdset %>% mutate(building.class.category=na_if(building.class.category,""))
+unique(bdset$building.class.category)
+
+bdset$building.class.category<- as.factor(bdset$building.class.category)
+summary(bdset$building.class.category)
+bdset$borough<- as.factor(bdset$borough)
+summary(bdset)
+```
+
+
+Outlier in sales price in log scale can be observed based on IQR and histogram. i.e Sale price < 10 and Sale price > 15
+
+```{r outlier}
+bdset1<- bdset
+ggplot(bdset1,mapping = aes(x=log(sale.price)))+geom_histogram( binwidth = 1, fill="green", color="black")
+ggplot(bdset1,mapping = aes(x=log(sale.price)))+geom_density(fill="blue")
+ggplot(bdset1)+geom_boxplot(mapping = aes(y=log(sale.price)))
+egg::ggarrange(ggplot(bdset1,mapping = aes(x=log(sale.price)))+geom_density(fill="blue"),
+               ggplot(bdset1)+geom_boxplot(mapping = aes(x=log(sale.price))), heights=2:1)
+```
+
+
+Filtering categories for 1/2/3 Family Home, Coops and condos. Filtering outlier on sale.price and required building class categories
+```{r filters}
+bdset1<- bdset %>% mutate(sale.date.mw = floor_date(sale.date,'month'))
+bdset1 <- bdset1 %>%
+  mutate(
+    buildingclasscat = case_when(
+      building.class.category=="01  ONE FAMILY HOMES" ~ "1 FH",
+      building.class.category=="02  TWO FAMILY HOMES" ~ "2 FH",
+      building.class.category=="03  THREE FAMILY HOMES"  ~  "3 FH",
+      grepl("COOPS",building.class.category) == TRUE ~ "COOPS",
+      grepl("CONDOS",building.class.category) == TRUE ~ "CONDOS",
+      TRUE ~ "NA"
+    )
+  ) 
+bdset1$buildingclasscat <- as.factor(bdset1$buildingclasscat)
+bdset2<- bdset1 %>% filter(log(sale.price)>5, log(sale.price)<=15,buildingclasscat %in% c("1 FH","2 FH","3 FH","COOPS","CONDOS"))
+summary(bdset2)
+```
+
+### Data analysis
+
+Plotting bar chart of building class category against borough, we can see number of Condos and Coops were sold more in Manhattan compared to other boroughs. Queens has highest number of single family homes sold while two family homes are were sold more in brooklyn and with queens beeing the next highest. Three family homes sales were not as much as the other categories
+
+```{r ggplot1}
+ggplot(bdset2)+geom_bar(mapping=aes(x=buildingclasscat,fill=borough), position = "dodge")
+
+```
+Line plot we can see that 
+
+1. Condo sale price spiked after July 2013 in Bronx
+2. Coops sale price remain consistent throughout the year in Brooklyn, Manhattan and Queens.Price fluctuations seen every quarter in Bronx and Staten Island
+3. Single family home prices dipped in Manhattan and Bronx for September 2012. Overall the prices remained consistent for rest of the months
+4. Three family home prices were sold for less price in October 2012, Feb 2012 and April 2012
+5. Sale price fluctuates through out the year for Two family homes in Manhattan
+
+```{r ggplot2}
+ggplot(bdset2)+
+    stat_summary(aes(x=sale.date.mw,y=log(sale.price),group=borough,color=borough),fun=mean,geom="line") +  
+    scale_x_date(NULL,date_breaks = "3 month",date_labels = "%b%y") + 
+    facet_wrap(~buildingclasscat,ncol=2)
+```

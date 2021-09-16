@@ -1,0 +1,3 @@
+"0","oj.ds<- read.csv(""HW4_S21/OJ.csv"")"
+"0",""
+"0","head(oj.ds)"

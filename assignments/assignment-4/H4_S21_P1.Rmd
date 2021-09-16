@@ -1,0 +1,92 @@
+---
+title: "H4_S21_P1"
+author: "Naveen"
+date: "4/25/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+options(scipen=999)
+library(tree)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/naveen/Desktop/workspace/stevens-fa/FE582WS/assignments/assignment-4/")
+```
+
+## Problem 1
+
+This problem use the OJ data set (OJ.csv).
+
+a)  Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+
+```{r a, include=FALSE, cache=TRUE}
+oj.ds<- read.csv("HW4_S21/OJ.csv")
+
+head(oj.ds)
+summary(oj.ds)
+
+oj.ds$Purchase<-as.factor(oj.ds$Purchase)
+oj.ds$Store7<-as.factor(oj.ds$Store7)
+oj.ds$STORE<-as.factor(oj.ds$STORE)
+oj.ds$StoreID<-as.factor(oj.ds$StoreID)
+
+oj.ds<-oj.ds %>% mutate(RID = row_number())
+oj.ds.train <- oj.ds %>% dplyr::slice_sample(n=800)
+oj.ds.test  <- anti_join(oj.ds, oj.ds.train, by = 'RID')
+oj.ds.train<-oj.ds.train %>% select(-c(RID))
+oj.ds.test<-oj.ds.test %>% select(-c(RID))
+```
+
+b)  Fit a tree to the training data, with Purchase as the response and the other variables as predictors. Use the summary() function to produce summary statistics about the tree, and describe the results obtained. What is the training error rate? How many terminal nodes does the tree have?
+
+```{r b, echo=TRUE, cache=TRUE}
+oj.ds.tree.fit<-tree(Purchase~.,oj.ds.train)
+summary(oj.ds.tree.fit)
+```
+
+  Of all the predictors most important indicators appear to be "LoyalCH"     "SalePriceMM" "SpecialCH"   "PriceDiff"   "PriceCH". Residual mean deviance is 0.7169. There are 9 terminal nodes. Error rate for the model is 0.1538.
+
+
+c)  Type in the name of the tree object in order to get a detailed text output. Pick one of the terminal nodes, and interpret the information displayed.
+
+```{r c, echo=TRUE, cache=TRUE}
+oj.ds.tree.fit
+```
+
+For 3rd Branch on left : When customer loyalty to Citrus Hill is < 0.48258 and > 0.071212 and Sale Price for Minute maid is less than < 2.04  then the decision tree moves to decide between MM or CH based on SpecialCH if it is < 0.5 then customer is likedy to buy MM else Citurs Hill orange juice
+
+d)  Create a plot of the tree, and interpret the results.
+
+```{r echo=TRUE, fig.dim=c(8,10), cache=TRUE}
+plot(oj.ds.tree.fit)
+text(oj.ds.tree.fit,pretty = 0)
+```
+Tree classification creates binary tree and starts by splitting decision based on LoyalCH if the value is less than 0.48285 then the decision tree moves to left else moves to right node. he tree keeps splitting until it reached the terminal nodes and then the values from the terminal node serves as response based on the predictors. 
+
+e)  Predict the response on the test data, and produce a confusion matrix comparing the test labels to the predicted test labels. What is the test error rate?
+
+```{r e, cache=TRUE}
+  oj.ds.test.predict <- predict(oj.ds.tree.fit,newdata = oj.ds.test,type="class")
+  oj.cm <- table(oj.ds.test.predict,oj.ds.test$Purchase)
+  oj.cm
+  1 - ( (oj.cm[1,1] + oj.cm[2,2]) / nrow(oj.ds.test))
+```
+
+Error rate is 0.2148148
+
+f)  Apply the cv.tree() function to the training set in order to determine the optimal tree size.
+
+```{r f, cache=TRUE}
+oj.ds.train.cv.tree <- cv.tree(oj.ds.tree.fit)
+oj.ds.train.cv.tree
+```
+
+Optimal tree size is 7 with dev of 693.3907
+
+g)  Produce a plot with tree size on the x-axis and cross-validated classification error rate on the y-axis.
+```{r g, cache=TRUE}
+  ggplot(mapping=aes(oj.ds.train.cv.tree$size, oj.ds.train.cv.tree$dev)) + geom_line() + geom_point() + xlab("size") +ylab("error")
+```
+
+
+

@@ -1,0 +1,495 @@
+---
+title: "HW2_P1"
+author: "Naveen Nagarajan"
+date: "3/22/2021"
+output: pdf_document
+---
+
+```{r LoadPackages, include=FALSE, cache= FALSE}
+library("ggplot2")
+library('gdata')
+library('dplyr')
+library('lubridate')
+library('tidyverse')
+library('collections')
+library('Hmisc')
+library('psych')
+options(scipen = 999)
+perl<-"C:\\Strawberry/perl/bin/perl.exe"
+#knitr::opts_knit$set(root.dir = 'Z:\\Desktop\\workspace\\stevens-fa\\FE582WS\\assignments\\assignment-2')
+#knitr::opts_knit$set(root.dir = 'Desktop/workspace/stevens-fa/FE582WS/assignments/assignment-2/')
+knitr::opts_chunk$set(tidy = TRUE) 
+knitr::opts_chunk$set(warning = FALSE) 
+```
+
+```{r loadFunctions, include=FALSE,cache=FALSE,results='hide'}
+lpNormDistance <- function(dataMatrix,
+                           p = 1,
+                           upper = FALSE,dictRelevance= NA) {
+  nrows <- nrow(dataMatrix)
+  ncols <- nrow(dataMatrix)
+  distMatrix <- matrix(0, nrow = nrows, ncol = ncols)
+  for (rowIdx in 1:nrows) {
+    for (colIdx in 1:ncols) {
+      X <- dataMatrix[rowIdx,]
+      Y <- dataMatrix[colIdx,]
+      if (upper) {
+        if (rowIdx == colIdx)
+          distMatrix[rowIdx, colIdx] <- NA
+        else if (rowIdx > colIdx) {
+          distMatrix[rowIdx, colIdx] <- NA
+        } else {
+          distMatrix[rowIdx, colIdx] <- lpNorm(X, Y, p,dictRelevance)
+        }
+      } else {
+        distMatrix[rowIdx, colIdx] <- lpNorm(X, Y, p,dictRelevance)
+      }
+    }
+  }
+  return(distMatrix)
+}
+
+
+
+lpNorm <- function(X, Y, p,dictRelevance) {
+  distance <- 0
+  for (indx in 1:length(X)) {
+    if (!is.na(X[indx]) && !is.na(Y[indx])){
+      idxKey<-paste(c("",indx),collapse = "")
+      if(is.na(dictRelevance) || (!is.na(dictRelevance) && dictRelevance$has(idxKey))){
+        distance <- distance + ((abs(X[indx] - Y[indx])) ^ p)
+      } else {
+        distance <- distance + ( dictRelevance$get(idxKey) * ((abs(X[indx] - Y[indx])) ^ p) )
+      }
+    }
+  }
+  return(distance ^ (1 / p))
+}
+
+
+pSelectDistance<- function(dataMatrix,
+                           p = 1,
+                           upper = FALSE,
+                           kd = 3,
+                           debugVector = NA) {
+  nrows <- nrow(dataMatrix)
+  ncols <- nrow(dataMatrix)
+  distMatrix <- matrix(0, nrow = nrows, ncol = ncols)
+  for (rowIdx in 1:nrows) {
+    for (colIdx in 1:ncols) {
+      X <- dataMatrix[rowIdx,]
+      Y <- dataMatrix[colIdx,]
+      if (upper) {
+        if (rowIdx == colIdx)
+          distMatrix[rowIdx, colIdx] <- NA
+        else if (rowIdx > colIdx) {
+          distMatrix[rowIdx, colIdx] <- NA
+        } else {
+          distMatrix[rowIdx, colIdx] <- pSelectM(dataMatrix,p,rowIdx,colIdx,kd,debugVector)
+        }
+      } else {
+        distMatrix[rowIdx, colIdx] <- pSelectM(dataMatrix,p,rowIdx,colIdx,kd,debugVector)
+      }
+    }
+  }
+  return(distMatrix)
+  
+}
+
+pSelectM <- function(dataMatrix,p, xIndex,yIndex,kd,debugVector) {
+  rowX<-dataMatrix[xIndex,]
+  rowY<-dataMatrix[yIndex,]
+  distance <- 0
+  for (colIdx in 1:length(rowX)) {
+    colVector<-dataMatrix[,colIdx]
+    freqVector<-cut2(colVector,g=kd)
+    bucketX<-freqVector[xIndex]
+    bucketY<-freqVector[yIndex]
+    if(!is.na(debugVector) && xIndex==debugVector[1] && yIndex==debugVector[2]){
+      print(paste(c("X Record: ",debugVector[1],",Y Record:",debugVector[2],",colIndex:",
+                    colIdx,",bucket X:",as.character(bucketX),",bucket Y:",as.character(bucketY)),collapse = " "))
+    }
+    if (!is.na(rowX[colIdx]) && !is.na(rowY[colIdx]) && bucketX==bucketY){
+        minBucket<-min(colVector[which(freqVector==bucketX)],na.rm = T)
+        maxBucket<-max(colVector[which(freqVector==bucketX)],na.rm = T)
+        distCalc<-(( 1 - ( abs(rowX[colIdx]-rowY[colIdx]) / (maxBucket-minBucket)   )) ^ p)
+        distance<-distance + distCalc
+        if(!is.na(debugVector) && xIndex==debugVector[1] && yIndex==debugVector[2]){
+          print(paste(c("   ","minBucket:",minBucket,",maxBucket:",maxBucket,",distCalc:",distCalc,",rowX[colIdx]",rowX[colIdx],",rowY[colIdx]",rowY[colIdx]),collapse = " "))
+        }
+    }
+  }
+  return(distance ^ (1 / p))
+}
+
+
+
+
+
+mahalanobisDistance<- function(dataMatrix,
+                           upper = FALSE,
+                           debugVector = NA) {
+  nrows <- nrow(dataMatrix)
+  ncols <- nrow(dataMatrix)
+  distMatrix <- matrix(0, nrow = nrows, ncol = ncols)
+  for (rowIdx in 1:nrows) {
+    for (colIdx in 1:ncols) {
+      X <- dataMatrix[rowIdx,]
+      Y <- dataMatrix[colIdx,]
+      if (upper) {
+        if (rowIdx == colIdx)
+          distMatrix[rowIdx, colIdx] <- NA
+        else if (rowIdx > colIdx) {
+          distMatrix[rowIdx, colIdx] <- NA
+        } else {
+          distMatrix[rowIdx, colIdx] <- mahalanobisM(dataMatrix,rowIdx,colIdx,debugVector)
+        }
+      } else {
+        distMatrix[rowIdx, colIdx] <- mahalanobisM(dataMatrix,rowIdx,colIdx,debugVector)
+      }
+    }
+  }
+  return(distMatrix)
+}
+
+mahalanobisM <- function(dataMatrix, xIndex,yIndex,debugVector=NA) {
+  rowX<-dataMatrix[xIndex,]
+  rowY<-dataMatrix[yIndex,]
+  dim(rowX)<-c(1,ncol(dataMatrix))
+  dim(rowY)<-c(1,ncol(dataMatrix))
+  maha<- ((rowX - rowY) %*% solve(cov(dataMatrix)) %*% t(rowX - rowY)) 
+  if(!is.na(debugVector) && xIndex==debugVector[1] && yIndex==debugVector[2]){
+    print(paste(c("X Record: ",debugVector[1],",Y Record:",debugVector[2],",maha:",maha),collapse = " "))
+  }
+  return(as.numeric(maha ^ (1 / 2)))
+}
+
+###### similarity functions ###########
+
+similarityfn<- function(dataMatrix,
+                               upper = FALSE,
+                               type = "inverse",
+                               debugVector = NA) {
+  nrows <- nrow(dataMatrix)
+  ncols <- nrow(dataMatrix)
+  distMatrix <- matrix(0, nrow = nrows, ncol = ncols)
+  for (rowIdx in 1:nrows) {
+    for (colIdx in 1:ncols) {
+      X <- dataMatrix[rowIdx,]
+      Y <- dataMatrix[colIdx,]
+      if (upper) {
+        if (rowIdx == colIdx)
+          distMatrix[rowIdx, colIdx] <- NA
+        else if (rowIdx > colIdx) {
+          distMatrix[rowIdx, colIdx] <- NA
+        } else {
+            distMatrix[rowIdx, colIdx] <- simsByType(dataMatrix,rowIdx,colIdx,type,debugVector)
+        }
+      } else {
+        distMatrix[rowIdx, colIdx] <- simsByType(dataMatrix,rowIdx,colIdx,type,debugVector)
+      }
+    }
+  }
+  return(distMatrix)
+}
+
+simsByType<-function(dataMatrix,rowIdx,colIdx,type,debugVector=NA){
+  if(type=="overlap"){
+    return(overlapSim(dataMatrix,rowIdx,colIdx,debugVector))
+  } else if(type=="inverse"){
+    return(inverseFrequencySim(dataMatrix,rowIdx,colIdx,debugVector))
+  } else if(type=="goodall"){
+    return(godallSim(dataMatrix,rowIdx,colIdx,debugVector))
+  }
+}
+
+overlapSim <- function(dataMatrix, xIndex,yIndex,debugVector=NA) {
+  rowX<-dataMatrix[xIndex,]
+  rowY<-dataMatrix[yIndex,]
+  dim(rowX)<-c(1,ncol(dataMatrix))
+  dim(rowY)<-c(1,ncol(dataMatrix))
+  similarityXY<-0
+  for (colIdx in 1:length(rowX)) {
+    if(!is.na(rowX[,colIdx]) && !is.na(rowX[,colIdx]) && rowX[,colIdx] == rowY[,colIdx]){
+      similarityXY<-similarityXY+1
+    }
+  }
+  return(similarityXY)
+}
+
+inverseFrequencySim <- function(dataMatrix, xIndex,yIndex,debugVector=NA) {
+  rowX<-dataMatrix[xIndex,]
+  rowY<-dataMatrix[yIndex,]
+  dim(rowX)<-c(1,ncol(dataMatrix))
+  dim(rowY)<-c(1,ncol(dataMatrix))
+  similarityXY<-0
+  for (colIdx in 1:length(rowX)) {
+    if(!is.na(rowX[,colIdx]) && !is.na(rowX[,colIdx]) && rowX[,colIdx]== rowY[,colIdx]){
+      featureVector<- dataMatrix[,colIdx]
+      pkx<-length(featureVector[featureVector==rowX[,colIdx]])/length(featureVector)
+      similarityXY<-similarityXY+(1/(pkx ^ 2))
+      if(!is.na(debugVector) && xIndex==debugVector[1] && yIndex==debugVector[2]){
+        print(paste(c("X Record: ",debugVector[1],",Y Record:",debugVector[2],"colIdx:",colIdx,",pkx:",pkx),collapse = " "))
+        print(length(featureVector[featureVector==rowX[,colIdx]]))
+        print(length(featureVector))
+      }
+    }
+  }
+  return(similarityXY)
+}
+
+
+godallSim <- function(dataMatrix, xIndex,yIndex,debugVector=NA) {
+  rowX<-dataMatrix[xIndex,]
+  rowY<-dataMatrix[yIndex,]
+  dim(rowX)<-c(1,ncol(dataMatrix))
+  dim(rowY)<-c(1,ncol(dataMatrix))
+  similarityXY<-0
+  for (colIdx in 1:length(rowX)) {
+    if(!is.na(rowX[,colIdx]) && !is.na(rowX[,colIdx]) && rowX[,colIdx]== rowY[,colIdx]){
+      featureVector<- dataMatrix[,colIdx]
+      pkx<-length(featureVector[featureVector==rowX[,colIdx]])/length(featureVector)
+      similarityXY<-similarityXY+(1 - (pkx ^ 2))
+    }
+  }
+  return(similarityXY)
+}
+
+overallSimilarity<-function(numDistMatrix, catSimMatrix, lam){
+  ## Using Kernel function to convert dist to num
+  numSimMatrix <- 1/(1 + numDistMatrix)
+  return ( (lam*numSimMatrix) + ((1-lam) * catSimMatrix) )
+}
+
+overallNormSimilarity<-function(numDistMatrix, catSimMatrix, lam){
+  ## Using Kernel function to convert dist to num
+  numSimMatrix <- 1/(1 + numDistMatrix)
+  return ( (lam *(numSimMatrix/sd(numSimMatrix,na.rm = T))) + ((1-lam) * (catSimMatrix/sd(catSimMatrix,na.rm = T)) ) )
+}
+
+## All display functions ##
+
+rankAMatrix<-function(matx,fctr=1){
+  return (matrix(rank(fctr*as.vector(matx),ties.method = "min",na.last = "keep"), nrow(matx), nrow(matx)))
+}
+
+
+
+displayRanks <- function(securitiesDf, rankMatrix,distanceMatrix, showDs=TRUE,sameRankShow=NA) {
+  print("######Top 10########")
+  minRanks<-min(as.vector(rankMatrix),na.rm = T)
+  maxRanks<-max(as.vector(rankMatrix),na.rm = T)
+  for (i in minRanks:(minRanks+9)) {
+    nRankIdx<- which(rankMatrix == i, arr.ind = T)
+    if(!is.na(sameRankShow))
+      nRankIdx<-head(nRankIdx,sameRankShow)
+    if(nrow(nRankIdx)==0) next
+    for(mIdx in 1:nrow(nRankIdx)){
+      nRankIdxs<-nRankIdx[mIdx,]
+      pair <-
+        securitiesDf %>% filter(IDX %in% nRankIdxs) %>% select(Ticker.Symbol) %>% unlist %>% paste(collapse = " ")
+      print(paste(c("Rank :", i, " pair :", pair," distance: ", distanceMatrix[as.numeric(nRankIdxs[1]),as.numeric(nRankIdxs[2])],"index: ","(", nRankIdxs[1],",",nRankIdxs[2],")"), collapse = " "))
+      if(showDs)
+        print(securitiesDf %>% filter(IDX %in% nRankIdxs) %>% tibble)
+    }
+  }
+  print("######Bottom 10########")
+  for (i in (maxRanks-9):maxRanks) {
+    nRankIdx<- which(rankMatrix == i, arr.ind = T)
+    if(!is.na(sameRankShow))
+      nRankIdx<-head(nRankIdx,sameRankShow)
+    if(nrow(nRankIdx)==0) next
+    for(mIdx in 1:nrow(nRankIdx)){
+      nRankIdxs<-nRankIdx[mIdx,]
+      pair <-
+        securitiesDf %>% filter(IDX %in% nRankIdxs) %>% select(Ticker.Symbol) %>% unlist %>% paste(collapse = " ")
+      print(paste(c("Rank :", i, " pair :", pair," distance: ", distanceMatrix[as.numeric(nRankIdxs[1]),as.numeric(nRankIdxs[2])],"index: ","(", nRankIdxs[1],",",nRankIdxs[2],")"), collapse = " "))
+      if(showDs)
+        print(securitiesDf %>% filter(IDX %in% nRankIdxs) %>% tibble)
+    }
+  }
+}
+
+```
+
+
+
+## R Markdown
+
+## Problem
+
+### FE582 – Assignment 2 Spring 2021
+
+The data provided in the files contains several quantitative and categorical variables associate with each ticker. Please select a subset of 100 tickers from each file and use data for a specific year (ex: 2013). Use a small number of quantitative variables (10 or 12) out of ~76 columns available (example: After Tax ROE, Cash Ratio, Current Ratio, Operating Margin, Pre-Tax Margin, Pre-Tax ROE, Profit Margin, Quick Ratio, Total Assets, Total Liabilities, Earnings Per Share, etc...). The categorical variables available are GICS Sector, GICS Sub Industry, and possibly HQ Address (although this is sparse data for the 100 tickers subset selected).
+Next, you have to apply several distance and similarity functions to find the extreme values for distance and similarities between the subset of tickers that you chose. For each of the following cases, please define the function that allows you to calculate the quantity required, calculate the values for all ticker pairs, and rank the pairs by calculated value of distance or similarity, and report the top and bottom 10 values for each case:
+a) LpNorm for p = 1
+b) LpNorm for p = 2
+c) LpNorm for p = 3
+d) LpNorm for p = 10
+e) Minkovski distance (assign different weights for the feature components in the Lp-norm
+based on your assessment on the importance of the features)
+f) Match-Based Similarity Computation (use a small number of equi-depth buckets, ex: 3)
+g) Mahalanobis distance
+h) Similarity: overlap measure
+i) Similarity: inverse frequency
+j) Similarity: Goodall
+k) Overall similarity between tickers by using mixed type data (choose a lamda value for
+calculation)
+l) Overall normalized similarity between tickers by using mixed type data (choose a lamda value for calculation)
+
+
+```{r load quant data,echo=FALSE, include=FALSE, cache=FALSE, results='hide' }
+securitiesQuant <- read.csv("HW2_S21/fundamentals.csv")
+#summary(securitiesQuant)
+securitiesQuant$Period.Ending <- as.Date(securitiesQuant$Period.Ending)
+
+filteredSecuritiesQuant <-
+  securitiesQuant %>% filter(Period.Ending == '2014-12-31') %>% distinct(Ticker.Symbol) %>% arrange(Ticker.Symbol) %>% head(100) %>% unlist(use.names = FALSE)
+
+#securitiesQuant%>% tibble %>% View()
+names(securitiesQuant)
+
+# Note : 
+# 1. pSelect : when including ratio columns - some of the the rows matched only on ratio columns and they were 
+#   falling under same bucket creating minkwoski distance of 1 
+# 2. pSelect: When including Inventories; bucket with all 0 values were created with min and max as 0
+# 3. What happens when fields are NA ??
+
+quantColumnSelection<-c("Accounts.Payable","Accounts.Receivable","Add.l.income.expense.items",
+  "Capital.Expenditures","Capital.Surplus","Cash.and.Cash.Equivalents","Common.Stocks",
+  "Cost.of.Revenue","Depreciation","Earnings.Before.Tax","Liabilities")
+
+
+
+
+filteredSecuritiesIdxQuant <-
+  securitiesQuant %>% filter(Period.Ending == '2014-12-31')  %>%
+  filter(Ticker.Symbol %in% filteredSecuritiesQuant) %>%
+  arrange(Ticker.Symbol) %>%
+  mutate(IDX = 1:n()) %>% select(IDX, Ticker.Symbol, quantColumnSelection)
+
+#filteredSecuritiesIdxQuant%>% tibble %>% View()
+
+filteredSecQuantMatrix <-
+  data.matrix(filteredSecuritiesIdxQuant %>% select(quantColumnSelection))
+
+#filteredSecQuantMatrix %>% View()
+```
+
+
+Summary of Quantitative dataset chosen
+
+```{r summary, echo=FALSE, include=FALSE, cache=FALSE}
+summary(securitiesQuant)
+names(securitiesQuant)
+
+```
+
+
+### a) Lp-norm for p-1
+
+```{r lpNorm1, echo=TRUE, include=TRUE, cache=FALSE}
+lpNormDistance1 <- lpNormDistance(filteredSecQuantMatrix, p = 1, upper = TRUE)
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(lpNormDistance1),lpNormDistance1,showDs = FALSE,sameRankShow = 3)
+
+```
+
+### b) Lp-norm for p-2
+```{r lpNorm2, echo=TRUE, include=TRUE, cache=FALSE}
+lpNormDistance2 <- lpNormDistance(filteredSecQuantMatrix, p = 2, upper = TRUE)
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(lpNormDistance2),lpNormDistance2,showDs = FALSE,sameRankShow = 3)
+```
+
+
+### c) Lp-norm for p-3
+```{r lpNorm3, echo=TRUE, include=TRUE, cache=FALSE}
+lpNormDistance3 <- lpNormDistance(filteredSecQuantMatrix, p = 3, upper = TRUE)
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(lpNormDistance3),lpNormDistance3,showDs = FALSE,sameRankShow = 3)
+```
+
+### d) Lp-norm for p-10
+```{r lpNorm10, echo=TRUE, include=TRUE, cache=FALSE}
+lpNormDistance10 <- lpNormDistance(filteredSecQuantMatrix, p = 10, upper = TRUE)
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(lpNormDistance10),lpNormDistance10,showDs = FALSE,sameRankShow = 3)
+```
+
+### e) Minkovski distance (assign different weights for the feature components in the Lp-norm based on your assessment on the importance of the features)
+
+```{r Minkovski, echo=TRUE, include=TRUE, cache=FALSE}
+minkowski <- lpNormDistance(filteredSecQuantMatrix, p = 10, upper = TRUE, dictRelevance= dict(list("1"=1,"2"=0.5,"3"=0.8,"4"=0.1,"5"=1,"6"=0.8,"7"=0.2,"8"=0.8,"9"=0.1,"10"=1,"11"=0.8)))
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(minkowski,fctr = 1),minkowski,showDs = FALSE,sameRankShow = 3)
+```
+
+
+### f) Match-Based Similarity Computation (use a small number of equi-depth buckets, ex: 3)
+
+```{r Match-Based, echo=TRUE, include=TRUE, cache=FALSE}
+pSelctMatrix <- pSelectDistance(filteredSecQuantMatrix,p=1,upper = TRUE,kd=3)
+#forcing NA for 0 distances, because some of the rows didn't match on any of fields bucket resulting in 0 distance
+#rk1<-rankAMatrix(pSelctMatrix,fctr = -1)
+#as.vector(which(rk1==4837,arr.ind = T))
+pSelctMatrix[pSelctMatrix==0]<- NA
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(pSelctMatrix,fctr = -1),pSelctMatrix,showDs = FALSE,sameRankShow = 10)
+```
+
+
+### g) Mahalanobis distance
+
+```{r Mahalanobis, echo=TRUE, include=TRUE, cache=FALSE}
+mahalanobisDistanceMatrix<-mahalanobisDistance(filteredSecQuantMatrix,upper = TRUE)
+displayRanks(filteredSecuritiesIdxQuant,rankAMatrix(mahalanobisDistanceMatrix,fctr = 1),mahalanobisDistanceMatrix,showDs = FALSE,sameRankShow = 10)
+```
+
+##Categorical Variables
+```{r load categorical data,echo=FALSE, include=FALSE, cache=FALSE, results='hide' }
+securitiesCategorical <- read.csv("HW2_S21/securities.csv")
+securitiesCategoricalFiltered <-
+  securitiesCategorical %>% filter(Ticker.symbol %in% filteredSecuritiesQuant)%>% 
+  arrange(Ticker.symbol) %>%
+  mutate(IDX = 1:n()) %>% 
+  select(IDX, Ticker.symbol, GICS.Sector:Address.of.Headquarters)
+
+names(securitiesCategoricalFiltered) <- c("IDX","Ticker.Symbol","GICS.Sector","GICS.Sub.Industry" ,"Address.of.Headquarters")
+securitiesCategoricalMtx<- securitiesCategoricalFiltered %>% select(GICS.Sector:Address.of.Headquarters) %>% as.matrix
+```
+
+### h) Similarity: overlap measure
+```{r overlap measure, echo=TRUE, include=TRUE, cache=FALSE}
+overlapSimMtx<-similarityfn(dataMatrix = securitiesCategoricalMtx,upper = TRUE, type = "overlap")
+displayRanks(securitiesCategoricalFiltered,rankAMatrix(replace(overlapSimMtx,overlapSimMtx==0,NA),fctr = -1),overlapSimMtx,showDs = FALSE,sameRankShow = 10)
+```
+### i) Similarity: inverse frequency
+```{r inverse frequency, echo=TRUE, include=TRUE, cache=FALSE}
+inverseSimMtx<-similarityfn(dataMatrix = securitiesCategoricalMtx,upper = TRUE, type = "inverse")
+displayRanks(securitiesCategoricalFiltered,rankAMatrix(replace(inverseSimMtx,inverseSimMtx==0,NA),fctr = -1),inverseSimMtx,showDs = FALSE,sameRankShow = 10)
+```
+
+### j) Similarity: Goodall
+
+```{r Goodall, echo=TRUE, include=TRUE, cache=FALSE}
+goodallSimMtx<-similarityfn(dataMatrix = securitiesCategoricalMtx,upper = TRUE, type = "goodall")
+displayRanks(securitiesCategoricalFiltered,rankAMatrix(replace(goodallSimMtx,goodallSimMtx==0,NA),fctr = -1),goodallSimMtx,showDs = FALSE,sameRankShow = 10)
+```
+
+
+
+## Merged dataset
+```{r mergedDS,echo=FALSE, include=FALSE, cache=FALSE, results='hide' }
+mergedQuantAndCatDS<-left_join(
+  filteredSecuritiesIdxQuant,
+  securitiesCategoricalFiltered %>% select(Ticker.Symbol,GICS.Sector ,GICS.Sub.Industry,Address.of.Headquarters),by = "Ticker.Symbol") 
+```
+
+
+### k) Overall similarity between tickers by using mixed type data (choose a lambda value for calculation)
+```{r Overall similarity, echo=TRUE, include=TRUE, cache=FALSE}
+overallSimilarityMtx<-overallSimilarity(mahalanobisDistanceMatrix,goodallSimMtx,0.8)
+displayRanks(mergedQuantAndCatDS,rankAMatrix(overallSimilarityMtx,fctr = -1),overallSimilarityMtx,showDs = FALSE,sameRankShow = 3)
+```
+
+### l) Overall normalized similarity between tickers by using mixed type data (choose a lambda value for calculation) 
+```{r Overall normalized similarity, echo=TRUE, include=TRUE, cache=FALSE}
+overallNormSimilarityMtx<-overallNormSimilarity(mahalanobisDistanceMatrix,goodallSimMtx,0.8)
+displayRanks(mergedQuantAndCatDS,rankAMatrix(overallNormSimilarityMtx,fctr = -1),overallNormSimilarityMtx,showDs = FALSE,sameRankShow = 3)
+```
+
